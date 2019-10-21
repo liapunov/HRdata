@@ -1,7 +1,7 @@
-# Analysing and applying simple ML methods to a relatively clean salary database
-The purpose of this small project is to apply simple data transformations and machine learning techniques in order to predict the expected salary of people person given a few descriptors such as their job title, their education and their experience.
+# Analysing and applying ML methods to a salary database
+The purpose of this project is to apply data transformations and machine learning techniques in order to predict the expected salary of people person given a few descriptors such as their job title, their education and their experience.
 
-While the dataset examined here is a heavily simplified data model of a real-world job market, the procedures implemented here should be easily transferable to more complex scenarios and with a richer variety of categories.
+While the dataset examined here is a simplified data model of a real-world job market, the procedures implemented here should be easily transferable to more complex scenarios and with a richer variety of categories.
 ## The Data
 
 The data we will work on in this project are:
