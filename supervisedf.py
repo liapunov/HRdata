@@ -142,19 +142,36 @@ class SupervisedDataframe:
         
     def check_nulls(self, erase=False):
         '''Check whether there are null features in both the train and the test sets.
-        There is the option to delete the relative rows.'''
-        # we need to be careful, as the target will be NA on the test part of the DF
-        null_vals = self.merged.drop([self.target_col], axis=1).isna().values.any()
-        null_ixs = self.merged.drop([self.target_col], axis=1).isna().index.values
-        if not null_vals:
+        There is the option to delete the relative rows.
+
+        Notes
+        -----
+        - The target column is ignored when counting nulls.
+        - When ``erase=True`` only training rows are removed, so the alignment of
+          the test set is preserved.
+        '''
+        features_only = self.merged.drop(columns=[self.target_col], errors="ignore")
+        null_counts = features_only.isna().groupby(level=0).sum()
+        has_nulls = bool(features_only.isna().any().any())
+
+        print("Missing values per split (NA counts):")
+        print(null_counts)
+
+        if not has_nulls:
             print("there are no NA values in the training dataFrame.")
+            return False
+
+        if erase:
+            train_rows_with_na = features_only.loc["train"].isna().any(axis=1)
+            train_idx_to_drop = train_rows_with_na[train_rows_with_na].index
+            if len(train_idx_to_drop):
+                drop_index = [("train", idx) for idx in train_idx_to_drop]
+                self.merged = self.merged.drop(index=drop_index)
+            print("all training rows with missing values were deleted; test rows were preserved.")
         else:
-            if erase:
-                self.merged.loc[null_ixs].dropna(inplace=True)
-                print("all rows with missing values were deleted.")
-            else:
-                "missing values were found, but not deleted."
-        return null_vals
+            print("missing values were found, but not deleted.")
+
+        return True
     
     def create_grouped_stats(self, col_list):
         '''Create group statistics out of a subset of categorical variables.
@@ -191,11 +208,19 @@ class SupervisedDataframe:
             raise ValueError("Grouping augmented dataframe has mismatched row count or index order.")
 
     def to_one_hot(self,features):
-        '''Transform some of the categorical features into binary features.'''
+        '''Transform some of the categorical features into binary features.
+
+        The one-hot columns are fitted on the training categories to ensure
+        the test set remains aligned even if it contains unseen categories.
+        '''
         for feat in features:
-            self.merged = pd.concat([self.merged, pd.get_dummies(self.merged[feat],\
-                                                                             prefix=feat)],axis=1)
-            self.merged = self.merged.drop(columns=[feat])
+            train_categories = self.merged.loc["train", feat].dropna().unique().tolist()
+            expected_columns = [f"{feat}_{cat}" for cat in train_categories]
+
+            dummies = pd.get_dummies(self.merged[feat], prefix=feat)
+            dummies = dummies.reindex(columns=expected_columns, fill_value=0)
+
+            self.merged = pd.concat([self.merged.drop(columns=[feat]), dummies], axis=1)
     
     def dict_replace(self,col,col_dict):
         '''Transform a column based on a dictionary.'''
