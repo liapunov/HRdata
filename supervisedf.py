@@ -173,18 +173,23 @@ class SupervisedDataframe:
         if not all([col in self.categoricals for col in col_list]):
             print("Cannot execute: some of the chosen columns are numerical.")
             return
-        
+
+        original_index = self.merged.index.copy()
+
         # group the training set according to the column list provided
         group = self.merged.loc["train"].dropna().groupby(col_list)[self.target_col]
-        mean = group.mean().reset_index().rename(columns={self.target_col:"groupMean"})
-        median = group.median().reset_index().rename(columns={self.target_col:"groupMedian"})
-        var = group.var().reset_index().rename(columns={self.target_col:"groupVar"})
-        
-        # apply the statistics to both the training and the validation set according to the 
-        # columns
-        for stat in [mean, median, var]:
-            self.merged = self.merged.reset_index(0).merge(stat,how="left").set_index("level_0")
-    
+        stats = (
+            group.agg(["mean", "median", "var"])
+            .rename(columns={"mean": "groupMean", "median": "groupMedian", "var": "groupVar"})
+            .reset_index()
+        )
+
+        stats_indexed = stats.set_index(col_list)
+        self.merged = self.merged.join(stats_indexed, on=col_list)
+
+        if len(self.merged) != len(original_index) or not self.merged.index.equals(original_index):
+            raise ValueError("Grouping augmented dataframe has mismatched row count or index order.")
+
     def to_one_hot(self,features):
         '''Transform some of the categorical features into binary features.'''
         for feat in features:
@@ -200,12 +205,21 @@ class SupervisedDataframe:
         '''Scale the selected numerical columns according to minmax or standard deviation.'''
         if method == "standard":
             for feat in features:
-                self.merged[feat] = (self.merged[feat] - self.merged[feat].mean())/\
-                                        self.merged[feat].std()
+                train_values = self.merged.loc["train", feat]
+                train_std = train_values.std()
+                if train_std == 0:
+                    continue
+                train_mean = train_values.mean()
+                self.merged[feat] = (self.merged[feat] - train_mean)/train_std
         elif method == "minmax":
             for feat in features:
-                self.merged[feat] = (self.merged[feat] - self.merged[feat].mean())/\
-                                     (self.merged[feat].max() - self.merged[feat].min())
+                train_values = self.merged.loc["train", feat]
+                train_min = train_values.min()
+                train_max = train_values.max()
+                denom = train_max - train_min
+                if denom == 0:
+                    continue
+                self.merged[feat] = (self.merged[feat] - train_min)/denom
         else:
             "this method is not implemented"
     
