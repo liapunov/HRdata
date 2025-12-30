@@ -16,37 +16,52 @@ class SupervisedDataframe:
     The use of the MultiIndex requires caution, as deleting rows does not remove them
     but just transform them in NaN, so dropna() is always required when extracting the train
     or the set data.'''
-    def __init__(self, train_src, test_src, target_src = ""):
+    def __init__(self, train_src, test_src, target_src="", target_col=None):
         train = pd.read_csv(file_base + train_src)
-        if train_src != "":
+        if target_src:
             train_target = pd.read_csv(file_base + target_src)
             train = train.merge(train_target, how="left")
-        self.target_col = train.columns[-1]
-            
+        if target_col:
+            self.target_col = target_col
+        elif target_src:
+            self.target_col = train_target.columns[-1]
+        else:
+            self.target_col = train.columns[-1]
+
         test = pd.read_csv(file_base + test_src)
-        
-        self.merged = pd.concat({"train":train,"test":test})
-        
+
+        self.merged = pd.concat({"train": train, "test": test})
+
         self.categoricals = self.merged.select_dtypes("object").columns.tolist()
         self.numericals = self.merged.select_dtypes("number").columns.tolist()
         self.dates = self.merged.select_dtypes("datetime").columns.tolist()
-        
+
         print("created dataframes with implied target column \"{}\"".format(self.target_col))
         print("Implied categorical variables: " + str(self.categoricals))
         print("Implied numerical variables: " + str(self.numericals))
         print("Implied datetime variables: " + str(self.dates))
-        
+
         print("information about the train DataFrame:")
         self.merged.loc["train"].info()
         print("information about the test DataFrame:")
-        self.merged.loc["test"].drop(["salary"],axis=1).info()
-        
+        test_info_df = self.merged.loc["test"]
+        if self.target_col in test_info_df.columns:
+            test_info_df = test_info_df.drop(columns=[self.target_col])
+        test_info_df.info()
+
     def set_target(self, new_target_col):
         '''Change the target column.'''
         self.target_col = new_target_col
         
     def get_train(self, dropna=False):
-        '''Return the training set (including the target column if present).'''
+        '''Return the training set (including the target column if present).
+
+        Examples
+        --------
+        data = SupervisedDataframe("train_features.csv", "test_features.csv", "train_salaries.csv", target_col="salary")
+        train = data.get_train()
+        assert "salary" in train.columns
+        '''
         train = self.merged.loc["train"] 
         if dropna:
             return train.dropna()
@@ -54,8 +69,18 @@ class SupervisedDataframe:
             return train
     
     def get_test(self):
-        '''Return the test set'''
-        return self.merged.loc["test"].drop(columns=["salary"]).dropna()
+        '''Return the test set without the target column when it is present.
+
+        Examples
+        --------
+        data = SupervisedDataframe("train_features.csv", "test_features.csv", "train_salaries.csv", target_col="salary")
+        test = data.get_test()
+        assert "salary" not in test.columns
+        '''
+        test = self.merged.loc["test"]
+        if self.target_col in test.columns:
+            test = test.drop(columns=[self.target_col])
+        return test.dropna()
                             
     def split_feature_target(self):
         '''Return the train set splitted into features and target.'''
@@ -185,5 +210,25 @@ class SupervisedDataframe:
             "this method is not implemented"
     
     def __getattr__(self, attr):
-        '''Get the pandas attributes from the embedded MultiIndex.'''
-        getattr(self.merged, attr)
+        '''Get the pandas attributes from the embedded MultiIndex.
+
+        Accessors like ``data.shape`` or ``data.head()`` are delegated to the
+        underlying ``merged`` dataframe.
+        '''
+        try:
+            return getattr(self.merged, attr)
+        except AttributeError as exc:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{attr}'") from exc
+
+
+def _run_sanity_checks():
+    data = SupervisedDataframe("train_features.csv", "test_features.csv", "train_salaries.csv", target_col="salary")
+    train = data.get_train()
+    assert data.target_col in train.columns
+    test = data.get_test()
+    assert data.target_col not in test.columns
+    assert data.shape == data.merged.shape
+
+
+if __name__ == "__main__":
+    _run_sanity_checks()
