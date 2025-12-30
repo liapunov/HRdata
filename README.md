@@ -10,6 +10,12 @@ SupervisedDataframe has tools to operate on the training and the validation set 
 - Creating grouped statistics (mean, median, var) based on the categorical columns of the training set
 - One hot encoding and scaling
 
+## Usage notes before model training
+
+To keep train/test alignment intact while preparing your data:
+- Run `check_nulls(erase=True)` to drop only training rows that contain missing feature values (the test set is never truncated). The method prints the per-column NA counts for the train and test splits to help you decide whether deletion or imputation is appropriate.
+- Run `to_one_hot([...])` after defining your categorical feature list. One-hot columns are fit on the training categories and reindexed so the test set always has the same columns (unseen test categories are safely ignored instead of shifting columns).
+
 ## The Data
 
 The data we will work on in this project are:
