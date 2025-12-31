@@ -1,6 +1,10 @@
 # Analysing and applying ML methods to a salary database
 The purpose of this project is to apply data transformations and machine learning techniques in order to predict the expected salary of people person given a few descriptors such as their job title, their education and their experience.
 
+## Project materials
+- The main technical narrative, walkthroughs, and experiments live in the Jupyter notebook: [HRdataNotebook.ipynb](HRdataNotebook.ipynb).
+- A business-focused slide deck summarizing value, robustness, and generalization guidance is available in [HR_Salary_Analysis_Briefing.pdf](HR_Salary_Analysis_Briefing.pdf).
+
 ## The Method
 The analysis is performed through the method provided by a utility class, SupervisedDataframe, which has been created to manage the pandas data structure for a typical EDA+fast-modeling job.
 SupervisedDataframe has tools to operate on the training and the validation set at the same time for data transformation and feature engineering. At the same time, the training and the validation set are properly isolated when special transformations (such as grouped statistics) are applied.
